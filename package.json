@@ -31,6 +31,7 @@
     "eslint-plugin-security": "^1.4.0",
     "mocha": "^5.1.1",
     "nodemon": "^1.17.4",
+    "pre-commit": "^1.2.2",
     "tsc": "^1.20150623.0",
     "typescript": "^2.8.3",
     "typescript-eslint-parser": "^15.0.0"
