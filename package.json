@@ -8,7 +8,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc",
     "dev": "tsc --watch & nodemon dist",
-    "lint": "eslint src --ext ts"
+    "lint": "./node_modules/.bin/eslint src --ext ts"
   },
   "dependencies": {
     "body-parser": "^1.18.3",
@@ -34,5 +34,11 @@
     "tsc": "^1.20150623.0",
     "typescript": "^2.8.3",
     "typescript-eslint-parser": "^15.0.0"
-  }
+  },
+  "workspaces": [
+    "core/*"
+  ],
+  "pre-commit": [
+    "lint"
+  ]
 }
