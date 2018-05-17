@@ -1,0 +1,385 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+
+Description: App services on ECS.
+
+Parameters:
+  KeyName:
+    Description: The EC2 Key Pair to allow SSH access to the instance.
+    Type: AWS::EC2::KeyPair::KeyName
+  GitHubAuthToken:
+    Description: GitHub access token.
+    Type: String
+  RepoOwner:
+    Description: Name of the GitHub user or org who owns the repository.
+    Type: String
+  RepoName:
+    Description: The GitHub repo name.
+    Type: String
+  BranchName:
+    Description: Name of repo branch to watch.
+    Type: String
+  PipelineBucketName:
+    Description: Name of S3 bucket to create for CodePipeline.
+    Type: String
+
+Resources:
+  ## ECS CLUSTER
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref AWS::StackName
+
+  EcsServiceScalingTargetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+      Policies:
+        - PolicyName: Scaling
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - application-autoscaling:*
+                  - ecs:*
+                  - cloudwatch:*
+                Resource: '*'
+
+
+  ##  SERVICE
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Ref AWS::StackName
+      RetentionInDays: 7
+
+  EcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref AWS::StackName
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CodeBuildPushPull
+            Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action:
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - ecr:BatchCheckLayerAvailability
+              - ecr:PutImage
+              - ecr:InitiateLayerUpload
+              - ecr:UploadLayerPart
+              - ecr:CompleteLayerUpload
+
+  EcsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn:
+      - EcrRepository
+    Properties:
+      Family: !Ref AWS::StackName
+      ContainerDefinitions:
+        - Name: !Ref AWS::StackName
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.us-east-1.amazonaws.com/${AWS::StackName}:latest
+          Cpu: 256
+          MemoryReservation: 512
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AWS::StackName
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: !Ref AWS::StackName
+          Environment:
+          - Name: NODE_ENV
+            Value: production
+          # any additional env vars
+
+  EcsService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - EcrRepository
+    Properties:
+      TaskDefinition: !Ref EcsTaskDefinition
+      DesiredCount: 0 # only when creating stack
+      LaunchType: FARGATE # or EC2 if using instances
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 50
+      PlacementStrategies:
+        - Type: spread
+          Field: instanceId
+      Cluster: !Ref EcsCluster
+
+  EcsServiceScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: 0
+      MaxCapacity: 0
+      ResourceId:
+        !Sub
+          - service/${EcsCluster}/${EcsService}
+          - EcsCluster: !Ref EcsCluster
+            EcsService: !GetAtt EcsService.Name
+      RoleARN: !GetAtt EcsServiceScalingTargetRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  EcsServiceScaleOutPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: EcsServiceScaleOutPolicy
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref EcsServiceScalingTarget
+      StepScalingPolicyConfiguration:
+        AdjustmentType: PercentChangeInCapacity
+        StepAdjustments:
+          - MetricIntervalLowerBound: 0
+            MetricIntervalUpperBound: 10
+            ScalingAdjustment: 10
+          - MetricIntervalLowerBound: 10
+            ScalingAdjustment: 30
+
+  EcsServiceScaleInPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: EcsServiceScaleInPolicy
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref EcsServiceScalingTarget
+      StepScalingPolicyConfiguration:
+        AdjustmentType: PercentChangeInCapacity
+        StepAdjustments:
+          - MetricIntervalLowerBound: -10
+            MetricIntervalUpperBound: 0
+            ScalingAdjustment: -10
+          - MetricIntervalUpperBound: -10
+            ScalingAdjustment: -30
+
+  EcsServiceHighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      EvaluationPeriods: 2
+      Statistic: Average
+      Threshold: 70
+      AlarmDescription: Alarm if ECS Service CPU high.
+      Period: 60
+      AlarmActions:
+        - !Ref EcsServiceScaleOutPolicy
+      Namespace: AWS/ECS
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref EcsCluster
+        - Name: ServiceName
+          Value: !GetAtt EcsService.Name
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      MetricName: CPUUtilization
+
+  EcsServiceLowCPUAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        EvaluationPeriods: 2
+        Statistic: Average
+        Threshold: 40
+        AlarmDescription: Alarm if ECS Service CPU low.
+        Period: 60
+        AlarmActions:
+          - !Ref EcsServiceScaleInPolicy
+        Namespace: AWS/ECS
+        Dimensions:
+          - Name: ClusterName
+            Value: !Ref EcsCluster
+          - Name: ServiceName
+            Value: !GetAtt EcsService.Name
+        ComparisonOperator: LessThanOrEqualToThreshold
+        MetricName: CPUUtilization
+
+
+
+  ## BUILD
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref PipelineBucketName
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service: codebuild.amazonaws.com
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource:
+                  !Sub
+                    - arn:aws:s3:::${S3Bucket}*
+                    - S3Bucket: !Ref S3Bucket
+        - PolicyName: ServicesAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                  - codecommit:*
+                Resource: '*'
+
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service: codepipeline.amazonaws.com
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource:
+                  !Sub
+                    - arn:aws:s3:::${S3Bucket}/*
+                    - S3Bucket: !Ref S3Bucket
+        - PolicyName: ServicesAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codepipeline:*
+                  - codebuild:*
+                  - lambda:*
+                  - iam:ListRoles
+                  - iam:PassRole
+                Resource: '*'
+
+
+  ##  BUILD
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref AWS::StackName
+      Description: App on ECS.
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Source:
+        Type: CODEPIPELINE
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: linuxContainer
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/docker:1.12.1
+        EnvironmentVariables:
+        - Name: APP_NAME
+          Value: !Ref AWS::StackName
+        - Name: APP_IMAGE
+          Value: !Sub ${AWS::AccountId}.dkr.ecr.us-east-1.amazonaws.com/${AWS::StackName}:latest
+      TimeoutInMinutes: 10
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+        - Key: role
+          Value: !Ref AWS::StackName
+
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref S3Bucket
+      Name: !Ref AWS::StackName
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              RunOrder: 1
+              ActionTypeId:
+                Version: 1
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: !Ref AWS::StackName
+              Configuration:
+                Owner: !Ref RepoOwner
+                Repo: !Ref RepoName
+                Branch: !Ref BranchName
+                OAuthToken: !Ref GitHubAuthToken
+        - Name: Build
+          Actions:
+            - Name: Build
+              RunOrder: 1
+              Configuration:
+                ProjectName: !Ref AWS::StackName
+              InputArtifacts:
+                - Name: !Ref AWS::StackName
+              ActionTypeId:
+                Version: 1
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: !Sub ${AWS::StackName}-built
+        - Name: Deploy
+          Actions:
+            - Name: Deployer
+              RunOrder: 1
+              ActionTypeId:
+                Version: 1
+                Category: Invoke
+                Owner: AWS
+                Provider: Lambda
+              Configuration:
+                FunctionName: !ImportValue ops-lambdas-prod:EcsDeployerLambdaFunctionName
+                UserParameters:
+                  !Sub
+                    - |
+                      {
+                        "Service": "${AWS::StackName}",
+                        "Family": "${AWS::StackName}",
+                        "EcsService": {
+                          "Name": "${EcsServiceName}",
+                          "Arn": "${EcsServiceArn}",
+                          "Cluster": "${EcsServiceCluster}"
+                        }
+                      }
+                    - EcsServiceName: !GetAtt EcsService.Name
+                      EcsServiceArn: !Ref EcsService
+                      EcsServiceCluster: !GetAtt EcsCluster.Arn
+
+Outputs:
+  EcsClusterName:
+    Description: ECS Cluster Name.
+    Value: !Ref EcsCluster
+
+  ServiceName:
+    Description:  ECS service name.
+    Value: !Ref EcsService
