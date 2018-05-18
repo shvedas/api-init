@@ -29,8 +29,10 @@ API requires PostgreSQL and Redis. These are all included in the docker compose 
 
 ## Start services
 
-* Start Dependent services `docker-compose -f ./scripts/docker-compose.yml up -d` or stop services `docker-compose -f ./scripts/docker-compose.yml stop`
-* Start API localy `yarn dev`
-* Check code quality `yarn lint`
+1. Start Dependent services `docker-compose -f ./scripts/docker-compose.yml up -d` or stop services `docker-compose -f ./scripts/docker-compose.yml stop`
+2. Build core modules `yarn build:core`
+3. Init project (init lerna, install node modules) `./scripts/yarn-workspaces.sh`
+4. Start API localy `yarn dev`
+  * Check code quality `yarn lint`
 
 $(docker-machine ip default)

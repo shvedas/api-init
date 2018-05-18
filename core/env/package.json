@@ -2,11 +2,15 @@
   "name": "app-env",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prepare": "./node_modules/.bin/tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "nconf": "^0.8.4"
+  },
+  "devDependencies": {
+    "typescript": "^2.6.2"
   }
 }

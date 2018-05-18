@@ -6,9 +6,11 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "build": "rm -rf dist && tsc",
-    "dev": "tsc --watch & nodemon dist",
-    "lint": "./node_modules/.bin/eslint src --ext ts",
+    "build": "npm run clean && tsc",
+    "dev": "tsc --watch -p tsconfig.src.json & nodemon dist",
+    "build:core": "lerna run prepare",
+    "clean": "rm -rf dist/*",
+    "lint": "./node_modules/.bin/tslint -c tslint.json -p tsconfig.src.json",
     "nsp": "./node_modules/.bin/snyk test"
   },
   "dependencies": {
@@ -25,18 +27,15 @@
     "@types/mocha": "^5.2.0",
     "@types/node": "^10.1.0",
     "chai": "^4.1.2",
-    "eslint": "^4.19.1",
-    "eslint-config-airbnb-base": "^12.1.0",
-    "eslint-plugin-import": "^2.11.0",
-    "eslint-plugin-promise": "^3.7.0",
-    "eslint-plugin-security": "^1.4.0",
     "mocha": "^5.1.1",
     "nodemon": "^1.17.4",
     "pre-commit": "^1.2.2",
     "snyk": "^1.80.1",
     "tsc": "^1.20150623.0",
-    "typescript": "^2.8.3",
-    "typescript-eslint-parser": "^15.0.0"
+    "tslint": "^5.10.0",
+    "tslint-config-standard": "^7.0.0",
+    "tslint-microsoft-contrib": "^5.0.3",
+    "typescript": "^2.8.3"
   },
   "workspaces": [
     "core/*"
