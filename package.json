@@ -8,7 +8,8 @@
   "scripts": {
     "build": "rm -rf dist && tsc",
     "dev": "tsc --watch & nodemon dist",
-    "lint": "./node_modules/.bin/eslint src --ext ts"
+    "lint": "./node_modules/.bin/eslint src --ext ts",
+    "nsp": "./node_modules/.bin/snyk test"
   },
   "dependencies": {
     "body-parser": "^1.18.3",
@@ -32,6 +33,7 @@
     "mocha": "^5.1.1",
     "nodemon": "^1.17.4",
     "pre-commit": "^1.2.2",
+    "snyk": "^1.80.1",
     "tsc": "^1.20150623.0",
     "typescript": "^2.8.3",
     "typescript-eslint-parser": "^15.0.0"
