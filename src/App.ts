@@ -1,18 +1,17 @@
-// @ts-check
-import * as express from 'express'
-import * as env from 'app-env';
+import * as express from 'express';
+import * as ENV from 'app-env';
+import * as bodyParser from 'body-parser';
 
 class App {
-  public express;
-
-  public someValue: string = '1';
+  public app: express.Application;
+  private env;
 
   constructor () {
-    this.express = express()
+    this.env = ENV();
+    this.app = express();
     this.mountRoutes()
-    this.someValue = '2';
 
-    console.log('env', env)
+    console.log('env', this.env.get('api'))
   }
   
   private mountRoutes (): void {
@@ -22,8 +21,14 @@ class App {
         message: 'Hello World!'
       })
     })
-    this.express.use('/', router)
+    this.app.use('/', router)
   }
+
+  private config(): void {
+    this.app.use(bodyParser.json());
+    this.app.use(bodyParser.urlencoded({ extended: false }));
+  }
+
 }
 
-export default new App().express
+export default new App().app;

@@ -7,3 +7,4 @@ jmeter.log
 npm-debug.log
 lerna-debug.log
 scripts/temp.sh
+data

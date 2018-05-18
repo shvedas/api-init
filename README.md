@@ -4,7 +4,7 @@
 
 API requires PostgreSQL and Redis. These are all included in the docker compose package, which will be provisioned as part of the setup below.
 
-## Pre required
+## Pre-Reqs
 1. Install [Docker](https://www.docker.com/)
   * Run `wget -qO- https://get.docker.com/ | sh`
   * Run `sudo usermod -aG docker $(whoami)`
@@ -13,7 +13,7 @@ API requires PostgreSQL and Redis. These are all included in the docker compose 
   * Run `sudo curl -o /usr/local/bin/docker-compose -L "https://github.com/docker/compose/releases/download/1.11.2/docker-compose-$(uname -s)-$(uname -m)"`
   * Run `sudo chmod +x /usr/local/bin/docker-compose`
   * Run `docker-compose -v`
-  * For **macOS** run `brew install docker-compose`
+  * For **macOS** run `brew install docker-compose` `eval "$(docker-machine env default)"`
 3. Install [nvm](https://github.com/creationix/nvm)
   * For **macOS** run `brew install nvm`
 4. Install [Node.js >= 8](https://nodejs.org/en/)
@@ -25,8 +25,12 @@ API requires PostgreSQL and Redis. These are all included in the docker compose 
   * For **macOS** run `brew install yarn --without-node`
 6. Clone this repo
 7. `yarn config set workspaces-experimental true`
-8. Run `./scripts/yarn-workspaces.sh`
+  * Run `./scripts/yarn-workspaces.sh`
 
 ## Start services
 
-* Start Dependent services `./scripts/dependent/docker.sh`
+* Start Dependent services `docker-compose -f ./scripts/docker-compose.yml up -d` or stop services `docker-compose -f ./scripts/docker-compose.yml stop`
+* Start API localy `yarn dev`
+* Check code quality `yarn lint`
+
+$(docker-machine ip default)
