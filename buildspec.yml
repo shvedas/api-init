@@ -9,7 +9,6 @@ phases:
       - echo "deb http://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
       - sudo apt-get -y update
       - apt-get install -y yarn
-      - yarn -v
   pre_build:
     commands:
       - ./scripts/yarn-workspaces.sh
