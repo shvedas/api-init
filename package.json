@@ -6,7 +6,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "build": "npm run clean && tsc",
+    "build": "npm run clean && tsc -p tsconfig.src.json",
     "dev": "tsc --watch -p tsconfig.src.json & nodemon dist",
     "build:core": "lerna run prepare",
     "clean": "rm -rf dist/*",
