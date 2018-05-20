@@ -4,21 +4,6 @@
 
 For geting github access token use https://github.com/settings/tokens/new and checked admin:repo_hook permissions.
 
-```
-aws cloudformation deploy \
-  --stack-name api-init \
-  --template-file ./aws-api-ci-cd.yaml \
-  --parameter-overrides \
-     KeyName=<KEY_NAME> \
-     GitHubAuthToken=<ACCESS_TOKEN> \
-     RepoOwner=<OWNER_NAME> \
-     RepoName=<REPO_NAME> \
-     BranchName=master \
-  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-  --no-execute-changeset
-```
-
-
 
 
 https://engineering.gosquared.com/aws-reinvent-2017
