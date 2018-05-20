@@ -9,9 +9,9 @@ phases:
       - echo "deb http://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
       - sudo apt-get -y update
       - apt-get install -y yarn
+      - npm i -g lerna@latest yarn@rc
   pre_build:
     commands:
-      - yarn global add lerna@latest
       - yarn config set workspaces-experimental true
       - lerna bootstrap
       - yarn build:core
