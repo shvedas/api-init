@@ -11,7 +11,9 @@ phases:
       - apt-get install -y yarn
   pre_build:
     commands:
-      - sudo ./scripts/yarn-workspaces.sh
+      - yarn global add lerna@latest
+      - yarn config set workspaces-experimental true
+      - lerna bootstrap
       - yarn build:core
       - yarn lint 
       - yarn build
